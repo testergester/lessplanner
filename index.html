@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Lesson Planner</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1e40af;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --text: #334155;
+            --border: #e2e8f0;
+            --danger: #ef4444;
+            --success: #22c55e;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 25px;
+        }
+
+        /* --- Sidebar Styling --- */
+        .sidebar {
+            background: var(--surface);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            height: fit-content;
+            border: 1px solid var(--border);
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            color: var(--primary);
+            margin: 0 0 20px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group { margin-bottom: 15px; }
+
+        label {
+            display: block;
+            font-weight: 600;
+            font-size: 0.85rem;
+            margin-bottom: 6px;
+            color: #475569;
+        }
+
+        input[type="text"], input[type="number"], input[type="password"], select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.95rem;
+            box-sizing: border-box;
+            background: #fff;
+        }
+
+        /* Sliders */
+        .range-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: #f1f5f9;
+            padding: 8px 12px;
+            border-radius: 8px;
+        }
+        input[type="range"] { flex: 1; cursor: pointer; }
+        .range-value { font-weight: 700; min-width: 30px; text-align: right; color: var(--primary); }
+
+        /* Radio Buttons */
+        .radio-group { display: flex; flex-wrap: wrap; gap: 8px; }
+        .radio-option {
+            font-size: 0.85rem;
+            background: #f1f5f9;
+            padding: 6px 12px;
+            border-radius: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+        .radio-option:hover { background: #e2e8f0; }
+        .radio-option input { margin: 0; accent-color: var(--primary); }
+
+        hr { border: 0; border-top: 1px solid var(--border); margin: 20px 0; }
+
+        /* Buttons */
+        button { cursor: pointer; }
+        
+        #generateBtn {
+            width: 100%;
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 1rem;
+            transition: background 0.2s;
+            margin-top: 10px;
+        }
+        #generateBtn:hover { background: var(--primary-dark); }
+        #generateBtn:disabled { background: #94a3b8; cursor: not-allowed; }
+
+        /* --- Main Content --- */
+        .main-content {
+            background: var(--surface);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            min-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid var(--border);
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border);
+            flex-wrap: wrap;
+        }
+
+        .tool-btn {
+            background: white;
+            border: 1px solid var(--border);
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 600;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+        .tool-btn:hover { background: #f8fafc; border-color: var(--primary); color: var(--primary); }
+
+        /* --- Output --- */
+        #output { flex: 1; font-size: 1rem; color: #1e293b; }
+        #output h3 { border-bottom: 2px solid var(--primary); padding-bottom: 8px; margin-top: 25px; }
+        #output table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        #output th, #output td { border: 1px solid #cbd5e1; padding: 12px; text-align: left; }
+        #output th { background-color: #f1f5f9; }
+
+        /* --- Modal (Lesson Bank) --- */
+        .modal {
+            display: none; 
+            position: fixed; 
+            z-index: 1000; 
+            left: 0;
+            top: 0;
+            width: 100%; 
+            height: 100%; 
+            background-color: rgba(0,0,0,0.5);
+            backdrop-filter: blur(2px);
+        }
+        .modal-content {
+            background-color: #fff;
+            margin: 5% auto;
+            padding: 25px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 800px;
+            border-radius: 12px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+        .close-modal {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close-modal:hover { color: #000; }
+
+        /* Bank List Items */
+        .bank-item {
+            border: 1px solid var(--border);
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #fafafa;
+        }
+        .bank-info h4 { margin: 0 0 5px 0; color: var(--primary); }
+        .bank-info p { margin: 0; font-size: 0.85rem; color: #64748b; }
+        .bank-actions { display: flex; gap: 10px; }
+        
+        .btn-load { background: var(--primary); color: white; border: none; padding: 6px 12px; border-radius: 4px; }
+        .btn-delete { background: var(--danger); color: white; border: none; padding: 6px 12px; border-radius: 4px; }
+
+        /* Loading Spinner */
+        .loading { display: none; text-align: center; margin: 40px 0; }
+        .spinner {
+            width: 50px; height: 50px; border: 5px solid #e2e8f0; 
+            border-top: 5px solid var(--primary); border-radius: 50%; 
+            animation: spin 1s linear infinite; margin: 0 auto 15px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        @media (max-width: 900px) {
+            .container { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <aside class="sidebar">
+        <h1>📚 Lesson Planner</h1>
+        
+        <div class="form-group">
+            <label>🔑 OpenRouter API Key</label>
+            <input type="password" id="apiKey" placeholder="sk-or-....">
+        </div>
+        <hr>
+        <div class="form-group">
+            <label>Students' Age Range</label>
+            <div class="range-container">
+                <input type="range" id="age" min="5" max="70" value="18">
+                <span class="range-value" id="ageVal">18</span>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Group Size</label>
+            <div class="range-container">
+                <input type="range" id="grpSize" min="1" max="50" value="12">
+                <span class="range-value" id="grpSizeVal">12</span>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Subject Focus</label>
+            <div class="radio-group" id="subjectGroup"></div>
+        </div>
+        <div class="form-group">
+            <label>Lesson Topic</label>
+            <input type="text" id="topic" placeholder="e.g. Present Perfect">
+        </div>
+        <div class="form-group">
+            <label>English Type</label>
+            <input list="englishTypes" id="engType" placeholder="Select...">
+            <datalist id="englishTypes">
+                <option value="General English"><option value="Academic English (EAP)">
+                <option value="Business English"><option value="Medical English">
+            </datalist>
+        </div>
+        <div class="form-group">
+            <label>Theme / Context</label>
+            <input list="themes" id="theme" placeholder="Select...">
+            <datalist id="themes">
+                <option value="Travel & Tourism"><option value="Technology">
+                <option value="Environment"><option value="Daily Routine">
+            </datalist>
+        </div>
+        <div class="form-group">
+            <label>Level (CEFR)</label>
+            <div class="radio-group" id="levelGroup"></div>
+        </div>
+        <hr>
+        <div class="form-group">
+            <label>AI Model</label>
+            <select id="aiModel"></select>
+        </div>
+        <div class="form-group">
+            <label>Max Tokens</label>
+            <input type="number" id="tokens" value="10000">
+        </div>
+        <div class="form-group">
+            <label>Temperature</label>
+            <div class="range-container">
+                <input type="range" id="temp" min="0.1" max="1" step="0.1" value="0.5">
+                <span class="range-value" id="tempVal">0.5</span>
+            </div>
+        </div>
+        <button id="generateBtn">⚡ Generate Lesson Plan</button>
+    </aside>
+
+    <main class="main-content">
+        <div class="toolbar">
+            <button class="tool-btn" onclick="copyToClipboard()">📋 Copy</button>
+            <button class="tool-btn" onclick="saveToBank()">💾 Save to Bank</button>
+            <button class="tool-btn" onclick="openBank()">📂 View Bank</button> 
+            <button class="tool-btn" onclick="saveAsPDF()">📄 PDF</button>
+            <button class="tool-btn" onclick="regenerate()">🔄 Regenerate</button>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p><strong>Thinking...</strong><br>Designing your lesson plan.</p>
+        </div>
+
+        <div id="output">
+            <div style="text-align: center; color: #64748b; margin-top: 50px;">
+                <p style="font-size: 1.1rem;">Ready to plan?</p>
+                <p>Fill out the form and click <strong>Generate</strong>.</p>
+            </div>
+        </div>
+    </main>
+</div>
+
+<div id="bankModal" class="modal">
+    <div class="modal-content">
+        <span class="close-modal" onclick="closeBank()">&times;</span>
+        <h2 style="color: var(--primary); margin-top:0;">📂 Lesson Plan Bank</h2>
+        <p style="color: #666; margin-bottom: 20px;">Your saved plans are stored in this browser's local storage.</p>
+        <div id="bankList">
+            </div>
+    </div>
+</div>
+
+<script>
+    // --- Configuration ---
+    const AI_MODELS = {
+        "ChatGPT OSS": "openai/gpt-oss-120b:exacto",
+        "ChatGPT o3": "openai/o3",
+        "ChatGPT 5 Mini": "openai/gpt-5-mini",
+        "ChatGPT 5 Nano": "openai/gpt-5-nano",
+        "ChatGPT 4.1": "openai/gpt-4.1",
+        "Gemini 3 Pro Preview": "google/gemini-3-pro-preview",
+        "Gemini 2.5": "google/gemini-2.5-flash",
+        "Gemini 3 Preview": "google/gemini-3-flash-preview",
+        "Grok 4.1 fast": "x-ai/grok-4.1-fast",
+        "DeepSeek v3.2S": "deepseek/deepseek-v3.2-speciale",
+    };
+    const SUBJECTS = ["Grammar", "Vocabulary", "Speaking Skills", "Reading Skills", "Writing Skills", "Listening Skills"];
+    const LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"];
+
+    let currentRawMarkdown = "";
+
+    // --- Init ---
+    document.addEventListener('DOMContentLoaded', () => {
+        // Models
+        const modelSel = document.getElementById('aiModel');
+        for (const [name, id] of Object.entries(AI_MODELS)) {
+            const opt = document.createElement('option');
+            opt.value = id; opt.textContent = name;
+            if (name.includes("Gemini 2.5")) opt.selected = true;
+            modelSel.appendChild(opt);
+        }
+        // Subjects
+        const subDiv = document.getElementById('subjectGroup');
+        SUBJECTS.forEach((s, i) => subDiv.innerHTML += `<label class="radio-option"><input type="radio" name="subject" value="${s}" ${i===0?'checked':''}> ${s}</label>`);
+        // Levels
+        const lvlDiv = document.getElementById('levelGroup');
+        LEVELS.forEach((l, i) => lvlDiv.innerHTML += `<label class="radio-option"><input type="radio" name="level" value="${l}" ${i===2?'checked':''}> ${l}</label>`);
+        // Sliders
+        ['age', 'grpSize', 'temp'].forEach(id => {
+            document.getElementById(id).addEventListener('input', (e) => document.getElementById(id+'Val').textContent = e.target.value);
+        });
+    });
+
+    // --- Generator Logic ---
+    document.getElementById('generateBtn').addEventListener('click', async () => {
+        const apiKey = document.getElementById('apiKey').value;
+        if (!apiKey) return alert("Please enter API Key.");
+
+        const ui = { btn: document.getElementById('generateBtn'), load: document.getElementById('loading'), out: document.getElementById('output') };
+        ui.btn.disabled = true; ui.load.style.display = 'block'; ui.out.innerHTML = ""; currentRawMarkdown = "";
+
+        const params = {
+            model: document.getElementById('aiModel').value,
+            tokens: parseInt(document.getElementById('tokens').value),
+            temp: parseFloat(document.getElementById('temp').value),
+            sub: document.querySelector('input[name="subject"]:checked').value,
+            topic: document.getElementById('topic').value || "General",
+            theme: `${document.getElementById('engType').value} - ${document.getElementById('theme').value}`,
+            lvl: document.querySelector('input[name="level"]:checked').value,
+            age: document.getElementById('age').value,
+            size: document.getElementById('grpSize').value
+        };
+
+        const prompt = buildPrompt(params);
+
+        try {
+            const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json", "HTTP-Referer": window.location.href, "X-Title": "ESL Planner" },
+                body: JSON.stringify({ model: params.model, messages: [{role:"system", content: prompt}], max_tokens: params.tokens, temperature: params.temp, stream: true })
+            });
+            if(!res.ok) throw new Error("API Error");
+            
+            const reader = res.body.getReader();
+            const dec = new TextDecoder();
+            let buf = "";
+
+            while(true) {
+                const {done, value} = await reader.read();
+                if(done) break;
+                buf += dec.decode(value, {stream: true});
+                const lines = buf.split("\n");
+                buf = lines.pop();
+
+                for(let line of lines) {
+                    line = line.trim();
+                    if(line.startsWith("data: ") && line !== "data: [DONE]") {
+                        try {
+                            const chunk = JSON.parse(line.slice(6)).choices?.[0]?.delta?.content;
+                            if(chunk) {
+                                currentRawMarkdown += chunk;
+                                ui.out.innerHTML = marked.parse(currentRawMarkdown);
+                            }
+                        } catch(e){}
+                    }
+                }
+            }
+        } catch(e) { ui.out.innerHTML = `<p style="color:red">${e.message}</p>`; }
+        finally { ui.load.style.display = 'none'; ui.btn.disabled = false; }
+    });
+
+    function buildPrompt(p) {
+        return `You are an expert ESL lesson planner. Generate a detailed lesson plan.\nCONTEXT: Subject:${p.sub}, Topic:${p.topic}, Theme:${p.theme}, Level:${p.lvl}, Age:${p.age}, Size:${p.size}, Duration:60min.\n
+        STRUCTURE (Markdown):
+        1. LEAD-IN (3 activities)
+        2. TESTING 1 (Diagnostic, 6 sentences)
+        3. TEACHING (Table of Meaning/Form/Pron, CCQs)
+        4. TESTING 2 (Controlled, 10 sentences + Key)
+        5. FINAL TESTING (Semi-controlled, 10 sentences + Key)
+        6. FREE PRACTICE (10 communicative tasks).`;
+    }
+
+    // --- Toolbar & Bank Functions ---
+    function copyToClipboard() {
+        if(!currentRawMarkdown) return alert("Nothing to copy!");
+        navigator.clipboard.writeText(currentRawMarkdown).then(() => alert("Copied!"));
+    }
+
+    function saveToBank() {
+        if(!currentRawMarkdown) return alert("Generate a plan first!");
+        const topic = document.getElementById('topic').value || "Untitled";
+        const bank = JSON.parse(localStorage.getItem('lessonBank') || "[]");
+        bank.push({ id: Date.now(), topic, date: new Date().toLocaleDateString(), content: currentRawMarkdown });
+        localStorage.setItem('lessonBank', JSON.stringify(bank));
+        alert("Saved to Bank!");
+    }
+
+    // --- MODAL LOGIC (The Fix) ---
+    const modal = document.getElementById('bankModal');
+    const bankList = document.getElementById('bankList');
+
+    function openBank() {
+        const bank = JSON.parse(localStorage.getItem('lessonBank') || "[]");
+        bankList.innerHTML = "";
+        
+        if(bank.length === 0) {
+            bankList.innerHTML = "<p style='text-align:center'>No saved plans yet.</p>";
+        } else {
+            // Sort by newest first
+            bank.reverse().forEach(plan => {
+                const div = document.createElement('div');
+                div.className = 'bank-item';
+                div.innerHTML = `
+                    <div class="bank-info">
+                        <h4>${plan.topic}</h4>
+                        <p>Saved on: ${plan.date}</p>
+                    </div>
+                    <div class="bank-actions">
+                        <button class="btn-load" onclick="loadPlan(${plan.id})">📂 Load</button>
+                        <button class="btn-delete" onclick="deletePlan(${plan.id})">🗑️</button>
+                    </div>
+                `;
+                bankList.appendChild(div);
+            });
+        }
+        modal.style.display = "block";
+    }
+
+    function closeBank() {
+        modal.style.display = "none";
+    }
+
+    function loadPlan(id) {
+        const bank = JSON.parse(localStorage.getItem('lessonBank') || "[]");
+        const plan = bank.find(p => p.id === id);
+        if(plan) {
+            currentRawMarkdown = plan.content;
+            document.getElementById('output').innerHTML = marked.parse(plan.content);
+            document.getElementById('topic').value = plan.topic; // Update title input
+            closeBank();
+        }
+    }
+
+    function deletePlan(id) {
+        if(!confirm("Delete this plan?")) return;
+        let bank = JSON.parse(localStorage.getItem('lessonBank') || "[]");
+        bank = bank.filter(p => p.id !== id);
+        localStorage.setItem('lessonBank', JSON.stringify(bank));
+        openBank(); // Refresh list
+    }
+
+    function saveAsPDF() {
+        if(!currentRawMarkdown) return alert("Generate a plan first!");
+        const topic = document.getElementById('topic').value || "Lesson";
+        html2pdf().set({ margin:0.5, filename:`${topic}_Plan.pdf`, html2canvas:{scale:2}, jsPDF:{unit:'in', format:'letter'} }).from(document.getElementById('output')).save();
+    }
+    
+    function regenerate() { if(currentRawMarkdown) document.getElementById('generateBtn').click(); }
+    
+    // Close modal if clicking outside box
+    window.onclick = function(event) { if (event.target == modal) closeBank(); }
+</script>
+
+</body>
+</html>
